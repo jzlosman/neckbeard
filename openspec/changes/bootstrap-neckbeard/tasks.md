@@ -19,8 +19,8 @@
 ## 3. Portable skill and project materials
 
 - [x] 3.1 Add the sole canonical `skills/neckbeard/SKILL.md` with standard `name`/trigger-only `description`, CLI-authoritative workflow, failure stop/report behavior, and no host-specific instructions or duplicate policy.
-- [ ] 3.2 Pressure-test the skill with a fresh agent in a red scenario: a failing scope check must stop work and report the exact violations without editing policy or bypassing the CLI.
-- [ ] 3.3 Pressure-test the skill with a fresh agent in a green scenario: a passing scope check must be invoked and reported alongside normal verification.
+- [x] 3.2 Pressure-test the skill with a fresh agent in a red scenario: a failing scope check must stop work and report the exact violations without editing policy or bypassing the CLI.
+- [x] 3.3 Pressure-test the skill with a fresh agent in a green scenario: a passing scope check must be invoked and reported alongside normal verification.
 - [x] 3.4 Create an accessible hand-authored canonical SVG and generate the supplementary PNG; document that the SVG is canonical.
 - [x] 3.5 Add public README and docs covering installation, policy schema/globs, fixed dependency catalog, CLI text/JSON/CI usage, limits, and the non-sandbox boundary.
 - [x] 3.6 Add MIT LICENSE and minimal public community files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and support guidance).

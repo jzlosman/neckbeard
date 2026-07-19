@@ -29,4 +29,5 @@ or hide changes merely to pass.
 The CLI is authoritative. The skill neither duplicates the policy nor replaces
 sandboxing, access controls, tests, security review, or human review. If a
 reported root cause is outside the assigned work, report that cause rather than
-symptom-patching it.
+symptom-patching it. See the concise [skill evaluation evidence](skill-evaluations.md)
+for the pressure cases that validate this workflow.
