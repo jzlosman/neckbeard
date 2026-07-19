@@ -15,5 +15,6 @@ htmlcov/
 .mypy_cache/
 
 # Local agent / editor state
+.pi-subagents/
 .worktrees/
 .DS_Store
