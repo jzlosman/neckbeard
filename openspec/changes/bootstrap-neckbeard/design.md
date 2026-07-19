@@ -27,7 +27,7 @@ Neckbeard SHALL require Python 3.11+ and Git. Python 3.11 supplies `tomllib`, al
 
 ### Repository-owned `.neckbeard.toml`
 
-The checker discovers the Git top-level directory and loads exactly `<root>/.neckbeard.toml`. The `[scope]` table holds optional `allow`, `deny`, `max_files`, `max_additions`, and `max_deletions` values plus required `allow_dependency_changes`. Missing, malformed, or semantically invalid policy is an error, not an implicit permissive fallback. This preserves identical local and CI behavior.
+After resolving the selected base, the checker loads `.neckbeard.toml` from that commit's Git tree, not the mutable working tree. The tree entry must be a regular blob with mode `100644` or `100755`; a missing, symlinked, or otherwise nonregular base entry is a policy error. Only the default unborn-`HEAD` empty-tree fallback reads `<root>/.neckbeard.toml`, and that fallback file must be a regular non-symlink opened without following links. The `[scope]` table holds optional `allow`, `deny`, `max_files`, `max_additions`, and `max_deletions` values plus required `allow_dependency_changes`. Missing, malformed, or semantically invalid policy is an error, not an implicit permissive fallback. This preserves identical local and CI behavior.
 
 A non-empty allow list constrains changed paths; a path matching any deny glob is always rejected. Limits are non-negative and optional. The scope checker normalizes paths to repository-relative POSIX form and rejects traversal-like policy entries instead of trying to repair them. Its glob grammar is intentionally small: `*` matches zero or more non-slash characters, `?` matches exactly one non-slash character, `**` matches zero or more characters including slashes, and every other character is literal. Patterns are full-path matches; leading slashes, backslashes, and `.`/`..` path segments are invalid. Dotfiles are ordinary path characters.
 
@@ -35,7 +35,7 @@ A non-empty allow list constrains changed paths; a path matching any deny glob i
 
 `neckbeard check` compares the working tree with `--base REV`, defaulting to `HEAD`. Only a missing default `HEAD` falls back to Git's empty tree; an explicitly invalid base is an error. The checker includes tracked staged and unstaged changes plus non-ignored untracked files, does not stage or alter anything, disables rename detection, and treats a rename as a deletion plus an addition. This avoids heuristic rename thresholds and ensures both paths are checked.
 
-Git numstat provides tracked line counts. Neckbeard derives additions for untracked text files locally; a binary or otherwise unmeasurable file is a fail-closed policy violation rather than silently counting as zero.
+Git numstat provides tracked line counts, including tracked Git symlink blobs without dereferencing their working-tree targets. Neckbeard derives additions for untracked text files locally; untracked symlinks, binary files, or otherwise unmeasurable files are fail-closed policy violations rather than silently counting as zero.
 
 ### Fixed sensitive dependency-path catalog
 

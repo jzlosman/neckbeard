@@ -11,8 +11,9 @@ rules to make a check pass. The `neckbeard` CLI is authoritative.
 
 ## Workflow
 
-1. From the repository (or any subdirectory), read the committed
-   `.neckbeard.toml` to understand the declared scope.
+1. From the repository (or any subdirectory), read the selected base commit's
+   `.neckbeard.toml` to understand the declared scope. In an unborn repository,
+   the root regular-file policy is the empty-tree fallback.
 2. Before completion or review, run:
 
    ```sh

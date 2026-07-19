@@ -4,7 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Coverage gate](https://img.shields.io/badge/coverage-%E2%89%A590%25-21A36A)](https://github.com/jzlosman/neckbeard/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-172033)](LICENSE)
-[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-portable-D9545D)](skills/neckbeard/SKILL.md)
+[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-host--neutral-D9545D)](skills/neckbeard/SKILL.md)
 
 **A Git diff scope fence for coding agents.** Neckbeard reads a
 repository-owned `.neckbeard.toml`, measures the complete working-tree diff,
@@ -85,8 +85,13 @@ tooling. Exit codes are exact:
 | 2 | Invocation, repository, policy, base, or Git error (`ERROR`). |
 
 The checker includes staged, unstaged, and non-ignored untracked files. It
-disables rename detection (a rename is a deletion plus an addition) and fails
-closed for binary or unmeasurable files.
+disables rename detection (a rename is a deletion plus an addition). Tracked
+Git symlinks are measured as Git blobs without reading their targets; untracked
+symlinks, binary files, and other unmeasurable files fail closed.
+
+The policy comes from the selected base commit, so a mutable working-tree
+policy cannot weaken it. Only an unborn repository's default empty-tree check
+reads the root policy file, which must be a regular non-symlink.
 
 ### Dependency-sensitive filenames
 
@@ -103,8 +108,10 @@ See [configuration](docs/configuration.md) for the complete policy reference.
 
 ## Agent skill
 
-The canonical portable skill is [`skills/neckbeard/`](skills/neckbeard/).
-Install or copy that directory using your host's documented skill mechanism:
+The canonical [`skills/neckbeard/`](skills/neckbeard/) directory contains
+host-neutral, Agent-Skills-standard instructions intended for compatible hosts;
+it is not host-certified. Installation locations are examples only—follow the
+host's current documentation:
 
 - Claude Code: project or user `.claude/skills/neckbeard/`
 - Codex: `$CODEX_HOME/skills/neckbeard/` (typically `~/.codex/skills/`)

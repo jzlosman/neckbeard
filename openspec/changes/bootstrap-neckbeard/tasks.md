@@ -28,7 +28,7 @@
 ## 4. Automation, review, and release
 
 - [x] 4.1 Add CI for supported Python versions that installs the built package, runs tests, lint/format checks, coverage threshold, and wheel/sdist build.
-- [ ] 4.2 Independently review the CLI/policy implementation against every OpenSpec requirement and resolve findings.
+- [x] 4.2 Independently review the CLI/policy implementation against every OpenSpec requirement and resolve findings.
 - [ ] 4.3 Independently review the portable skill, documentation, and release artifacts for host-neutrality, accuracy, accessibility, and scope.
 - [ ] 4.4 Run final clean-worktree verification: full tests, lint/format, coverage, package build, representative text/JSON CLI checks, and both fresh-agent pressure scenarios.
 - [ ] 4.5 Inspect the final diff and status, then create a local Git commit containing the validated change.

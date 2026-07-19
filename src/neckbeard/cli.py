@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import subprocess
 import sys
 import tomllib
@@ -99,17 +100,10 @@ def validate_patterns(value: Any, field: str) -> tuple[str, ...]:
     return tuple(patterns)
 
 
-def load_policy(root: Path) -> Policy:
-    filename = root / ".neckbeard.toml"
+def parse_policy(contents: bytes) -> Policy:
     try:
-        if filename.is_symlink():
-            raise NeckbeardError("policy-error", ".neckbeard.toml must not be a symlink")
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        with os.fdopen(os.open(filename, flags), "rb") as policy_file:
-            data = tomllib.load(policy_file)
-    except FileNotFoundError as error:
-        raise NeckbeardError("policy-error", "missing .neckbeard.toml") from error
-    except (OSError, tomllib.TOMLDecodeError) as error:
+        data = tomllib.loads(contents.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise NeckbeardError("policy-error", f"invalid .neckbeard.toml: {error}") from error
     scope = data.get("scope")
     if not isinstance(scope, dict):
@@ -135,6 +129,51 @@ def load_policy(root: Path) -> Policy:
         limits["max_additions"],
         limits["max_deletions"],
     )
+
+
+def empty_tree_policy(root: Path) -> bytes:
+    filename = root / ".neckbeard.toml"
+    try:
+        mode = os.lstat(filename).st_mode
+    except FileNotFoundError as error:
+        raise NeckbeardError("policy-error", "missing .neckbeard.toml") from error
+    except OSError as error:
+        raise NeckbeardError("policy-error", f"invalid .neckbeard.toml: {error}") from error
+    if stat.S_ISLNK(mode):
+        raise NeckbeardError("policy-error", ".neckbeard.toml must not be a symlink")
+    if not stat.S_ISREG(mode):
+        raise NeckbeardError("policy-error", ".neckbeard.toml must be a regular file")
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(filename, flags), "rb") as policy_file:
+            return policy_file.read()
+    except OSError as error:
+        raise NeckbeardError("policy-error", f"invalid .neckbeard.toml: {error}") from error
+
+
+def committed_policy(root: Path, base: str) -> bytes:
+    entry = git(root, "ls-tree", "-z", base, "--", ".neckbeard.toml")
+    if entry.returncode:
+        raise NeckbeardError("git-error", os.fsdecode(entry.stderr).strip() or "could not read base policy")
+    entries = [item for item in entry.stdout.split(b"\0") if item]
+    if len(entries) != 1:
+        raise NeckbeardError("policy-error", "missing .neckbeard.toml in base commit")
+    try:
+        header, path = entries[0].split(b"\t", 1)
+        mode, kind, object_id = header.split()
+    except ValueError as error:
+        raise NeckbeardError("git-error", "unexpected Git tree output") from error
+    if path != b".neckbeard.toml" or mode not in {b"100644", b"100755"} or kind != b"blob":
+        raise NeckbeardError("policy-error", ".neckbeard.toml in base commit must be a regular Git blob")
+    contents = git(root, "cat-file", "blob", os.fsdecode(object_id))
+    if contents.returncode:
+        raise NeckbeardError("git-error", os.fsdecode(contents.stderr).strip() or "could not read base policy")
+    return contents.stdout
+
+
+def load_policy(root: Path, base: str) -> Policy:
+    contents = empty_tree_policy(root) if base == EMPTY_TREE else committed_policy(root, base)
+    return parse_policy(contents)
 
 
 def glob_matches(pattern: str, path: str) -> bool:
@@ -298,8 +337,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parser.parse_args(args_list)
         root = repository_root()
-        policy = load_policy(root)
-        payload = evaluate(root, policy, select_base(root, args.base))
+        base = select_base(root, args.base)
+        policy = load_policy(root, base)
+        payload = evaluate(root, policy, base)
         as_json = args.as_json
     except NeckbeardError as error:
         payload = error_verdict(error)

@@ -119,22 +119,43 @@ class NeckbeardCliTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
         self.assertEqual("pass", json.loads(completed.stdout)["verdict"])
 
-    def test_policy_symlinks_are_rejected_without_following_their_targets(self):
+    def test_committed_policy_symlink_is_rejected_without_following_its_target(self):
         with tempfile.TemporaryDirectory() as external:
-            targets = (Path(external) / "policy.toml", self.repo / "inside-policy.toml")
-            for target in targets:
-                with self.subTest(target=target):
-                    target.write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
-                    (self.repo / ".neckbeard.toml").unlink()
-                    (self.repo / ".neckbeard.toml").symlink_to(target)
-                    self.write("disallowed.txt", "changed\n")
-                    completed, payload = self.result()
-                    self.assertEqual(2, completed.returncode)
-                    self.assertEqual("policy-error", payload["error"]["code"])
-                    self.assertIn("symlink", payload["error"]["message"])
-                    (self.repo / ".neckbeard.toml").unlink()
-                    self.write_policy()
-                    (self.repo / "disallowed.txt").unlink()
+            target = Path(external) / "policy.toml"
+            target.write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
+            (self.repo / ".neckbeard.toml").unlink()
+            (self.repo / ".neckbeard.toml").symlink_to(target)
+            self.git("add", ".neckbeard.toml")
+            self.git("commit", "-qm", "symlinked policy")
+            completed, payload = self.result()
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("policy-error", payload["error"]["code"])
+        self.assertIn("regular Git blob", payload["error"]["message"])
+
+    def test_missing_committed_policy_is_rejected(self):
+        self.git("rm", ".neckbeard.toml")
+        self.git("commit", "-qm", "remove policy")
+        completed, payload = self.result()
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("policy-error", payload["error"]["code"])
+        self.assertIn("missing .neckbeard.toml in base commit", payload["error"]["message"])
+
+    def test_base_policy_ignores_an_unstaged_permissive_replacement(self):
+        self.set_policy(allow=["src/**"])
+        self.write_policy(allow=["**"])
+        self.write("outside.txt", "changed\n")
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertIn(("outside.txt", "path-not-allowed"), {(v["path"], v["code"]) for v in payload["violations"]})
+
+    def test_explicit_base_selects_its_committed_policy(self):
+        self.set_policy(allow=["src/**"])
+        base = self.git("rev-parse", "HEAD").stdout.strip()
+        self.set_policy(allow=["**"])
+        self.write("outside.txt", "changed\n")
+        completed, payload = self.result("--base", base)
+        self.assertEqual(1, completed.returncode)
+        self.assertIn(("outside.txt", "path-not-allowed"), {(v["path"], v["code"]) for v in payload["violations"]})
 
     def test_cli_ignores_an_inherited_conflicting_git_dir(self):
         self.set_policy(deny=["main.txt"])
@@ -167,6 +188,8 @@ class NeckbeardCliTests(unittest.TestCase):
         self.assertEqual(2, completed.returncode)
         self.assertEqual("base-error", payload["error"]["code"])
         self.write(".neckbeard.toml", '[scope]\nallow_dependency_changes = "false"\n')
+        self.git("add", ".neckbeard.toml")
+        self.git("commit", "-qm", "invalid policy")
         completed, payload = self.result()
         self.assertEqual(2, completed.returncode)
         self.assertEqual("error", payload["verdict"])
@@ -186,6 +209,8 @@ class NeckbeardCliTests(unittest.TestCase):
         for policy in invalid:
             with self.subTest(policy=policy):
                 self.write(".neckbeard.toml", policy)
+                self.git("add", ".neckbeard.toml")
+                self.git("commit", "-qm", "invalid policy")
                 completed = self.check("--json")
                 self.assertEqual(2, completed.returncode)
 
@@ -281,6 +306,30 @@ class NeckbeardCliTests(unittest.TestCase):
         self.assertEqual(EMPTY_TREE, payload["base"])
         self.assertIn("new.txt", payload["changed_paths"])
 
+    def test_unborn_policy_symlink_is_rejected_without_following_its_target(self):
+        self.temp.cleanup()
+        self.temp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.temp.name)
+        self.git("init", "-q")
+        target = self.repo.parent / "outside-policy.toml"
+        target.write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
+        (self.repo / ".neckbeard.toml").symlink_to(target)
+        completed, payload = self.result()
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("policy-error", payload["error"]["code"])
+        self.assertIn("symlink", payload["error"]["message"])
+
+    def test_unborn_policy_must_be_a_regular_file(self):
+        self.temp.cleanup()
+        self.temp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.temp.name)
+        self.git("init", "-q")
+        (self.repo / ".neckbeard.toml").mkdir()
+        completed, payload = self.result()
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("policy-error", payload["error"]["code"])
+        self.assertIn("regular file", payload["error"]["message"])
+
     def test_binary_files_fail_closed(self):
         self.write("blob.bin", b"a\x00b", binary=True)
         completed = self.check()
@@ -298,6 +347,20 @@ class NeckbeardCliTests(unittest.TestCase):
         self.assertEqual(1, completed.returncode)
         self.assertEqual({"changed_files": 1, "additions": 0, "deletions": 0}, payload["summary"])
         self.assertIn(("link.txt", "unmeasurable-file"), {(v["path"], v["code"]) for v in payload["violations"]})
+
+    def test_tracked_symlink_uses_git_blob_metrics_without_reading_its_target(self):
+        first = self.repo.parent / "first-target"
+        second = self.repo.parent / "second-target"
+        first.write_bytes(b"first\0target")
+        second.write_bytes(b"second\0target")
+        (self.repo / "link.txt").symlink_to(first)
+        self.commit("tracked symlink")
+        (self.repo / "link.txt").unlink()
+        (self.repo / "link.txt").symlink_to(second)
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual({"changed_files": 1, "additions": 1, "deletions": 1}, payload["summary"])
+        self.assertEqual([], payload["violations"])
 
     def test_every_sensitive_filename_nested_requires_approval_in_byte_order(self):
         for name in SENSITIVE:

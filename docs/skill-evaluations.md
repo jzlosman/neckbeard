@@ -1,8 +1,8 @@
 # Skill evaluation evidence
 
 These small, fresh-agent pressure cases validate the portable
-[`neckbeard`](../skills/neckbeard/SKILL.md) skill's test-first completion
-workflow. They record outcomes rather than agent transcripts.
+[`neckbeard`](../skills/neckbeard/SKILL.md) skill's completion-gate
+evaluation workflow. They record outcomes rather than agent transcripts.
 
 | Pressure case | Baseline without the skill | Expected behavior | Observed with the skill |
 | --- | --- | --- | --- |

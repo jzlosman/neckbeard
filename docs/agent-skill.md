@@ -1,14 +1,14 @@
 # Agent skill
 
 [`skills/neckbeard/SKILL.md`](../skills/neckbeard/SKILL.md) is the sole
-canonical, portable Agent Skills instruction. Its frontmatter contains only a
-name and trigger-focused description, so it does not depend on a specific
-agent host.
+canonical, host-neutral Agent-Skills-standard instruction, intended for
+compatible hosts rather than certified for any host. Its frontmatter contains
+only a name and trigger-focused description.
 
 ## Install
 
 Copy the entire `skills/neckbeard/` directory through the host's documented
-skill installation mechanism. Common project or user locations include
+skill installation mechanism. The following locations are examples only:
 `.claude/skills/` for Claude Code, `$CODEX_HOME/skills/` for Codex,
 `.gemini/skills/` for Gemini CLI, and `.pi/skills/` for Pi. skills.sh users
 should import the same canonical directory through skills.sh rather than fork

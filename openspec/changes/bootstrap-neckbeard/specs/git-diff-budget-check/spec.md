@@ -33,6 +33,14 @@ The system SHALL calculate unique changed-file count, textual additions, and tex
 - **WHEN** an untracked text file contains two lines and the policy sets `max_additions = 1`
 - **THEN** the checker reports an additions-budget violation
 
+#### Scenario: Measure a tracked Git symlink blob without dereferencing it
+- **WHEN** a tracked symlink changes and its target is outside the repository
+- **THEN** the checker uses Git's blob numstat for the symlink and does not read the target
+
+#### Scenario: Reject an untracked symlink
+- **WHEN** an untracked path is a symlink
+- **THEN** the checker reports it as an unmeasurable file without reading its target
+
 ### Requirement: Produce deterministic change facts
 The system SHALL sort changed paths in bytewise repository-relative path order and sort violations by repository-relative path bytes followed by violation code before rendering a verdict. It SHALL not mutate the Git index, configuration, or working tree while checking.
 

@@ -1,7 +1,10 @@
 # Configuration
 
-Neckbeard loads exactly `<Git-root>/.neckbeard.toml`. The file must be a regular
-file (not a symlink) with a `[scope]` table and the required boolean
+After resolving the comparison base, Neckbeard loads `.neckbeard.toml` from
+that base commit's Git tree. It must be a regular Git blob (mode `100644` or
+`100755`), never a symlink. Only the default empty-tree check in an unborn
+repository reads `<Git-root>/.neckbeard.toml`; that fallback must be a regular
+non-symlink file. The policy has a `[scope]` table and the required boolean
 `allow_dependency_changes`.
 
 ```toml
@@ -40,8 +43,10 @@ against Git's empty tree; an invalid explicit base is an error.
 
 Renames are deliberately counted as a deletion plus an addition. Git numstat
 measures tracked text changes; untracked text files are counted locally.
-Binary, symlinked, or otherwise unmeasurable files produce an explicit
-`unmeasurable-file` violation rather than being silently undercounted.
+Tracked Git symlinks are measured from their Git blobs without dereferencing
+their targets. Untracked symlinks, binary files, or otherwise unmeasurable
+files produce an explicit `unmeasurable-file` violation rather than being
+silently undercounted.
 
 ## Dependency-sensitive catalog
 

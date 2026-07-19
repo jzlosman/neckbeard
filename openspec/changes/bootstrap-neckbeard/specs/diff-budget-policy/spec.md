@@ -1,10 +1,18 @@
 ## ADDED Requirements
 
 ### Requirement: Load a repository-owned scope policy
-The system SHALL locate the Git repository root and load `<repository-root>/.neckbeard.toml`. The policy SHALL contain a `[scope]` table with a required boolean `allow_dependency_changes` value and MAY contain `allow`, `deny`, `max_files`, `max_additions`, and `max_deletions`. `allow` and `deny` values SHALL be arrays of repository-relative glob strings, and numeric limits SHALL be non-negative integers. An omitted numeric limit SHALL impose no limit.
+After resolving the comparison base, the system SHALL load `.neckbeard.toml` from that base commit's Git tree, not `<repository-root>/.neckbeard.toml` in the mutable working tree. The base entry SHALL be a regular Git blob with mode `100644` or `100755`; a missing, symlinked, or otherwise nonregular entry is a policy error. Only the default unborn-`HEAD` empty-tree fallback SHALL load `<repository-root>/.neckbeard.toml`; that fallback file SHALL be a regular non-symlink and be opened without following links. The policy SHALL contain a `[scope]` table with a required boolean `allow_dependency_changes` value and MAY contain `allow`, `deny`, `max_files`, `max_additions`, and `max_deletions`. `allow` and `deny` values SHALL be arrays of repository-relative glob strings, and numeric limits SHALL be non-negative integers. An omitted numeric limit SHALL impose no limit.
+
+#### Scenario: Ignore a mutable policy replacement
+- **WHEN** a base commit policy allows only `src/**` and its working-tree `.neckbeard.toml` is replaced without committing it to allow every path
+- **THEN** a changed path outside `src/**` is rejected using the base policy
+
+#### Scenario: Reject a nonregular base policy
+- **WHEN** the selected base commit stores `.neckbeard.toml` as a symlink or another nonregular tree entry
+- **THEN** the checker exits with a policy error without reading the working-tree policy
 
 #### Scenario: Load path rules and budgets
-- **WHEN** `.neckbeard.toml` declares an allow glob, a deny glob, `max_files`, `max_additions`, `max_deletions`, and `allow_dependency_changes = false`
+- **WHEN** the selected base policy declares an allow glob, a deny glob, `max_files`, `max_additions`, `max_deletions`, and `allow_dependency_changes = false`
 - **THEN** the checker evaluates the diff against those declared values
 
 #### Scenario: Omit a numeric budget
