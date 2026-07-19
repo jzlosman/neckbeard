@@ -64,7 +64,7 @@ def repository_root() -> Path:
     result = git(None, "rev-parse", "--show-toplevel")
     if result.returncode:
         raise NeckbeardError("repository-error", "not inside a Git working tree")
-    return Path(os.fsdecode(result.stdout.rstrip(b"\n")))
+    return Path(os.fsdecode(result.stdout.removesuffix(b"\n")))
 
 
 def validate_patterns(value: Any, field: str) -> tuple[str, ...]:
@@ -85,7 +85,10 @@ def validate_patterns(value: Any, field: str) -> tuple[str, ...]:
 def load_policy(root: Path) -> Policy:
     filename = root / ".neckbeard.toml"
     try:
-        with filename.open("rb") as policy_file:
+        if filename.is_symlink():
+            raise NeckbeardError("policy-error", ".neckbeard.toml must not be a symlink")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(filename, flags), "rb") as policy_file:
             data = tomllib.load(policy_file)
     except FileNotFoundError as error:
         raise NeckbeardError("policy-error", "missing .neckbeard.toml") from error

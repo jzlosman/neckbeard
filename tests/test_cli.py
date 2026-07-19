@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,12 @@ SENSITIVE = (
     "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
     "Cargo.toml", "Cargo.lock", "go.mod", "go.sum",
 )
+
+
+def isolated_git_environment():
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    return environment
 
 
 class NeckbeardCliTests(unittest.TestCase):
@@ -32,7 +39,7 @@ class NeckbeardCliTests(unittest.TestCase):
 
     def git(self, *args):
         return subprocess.run(["git", *args], cwd=self.repo, check=True,
-                              text=True, capture_output=True)
+                              text=True, capture_output=True, env=isolated_git_environment())
 
     def write(self, path, content, binary=False):
         target = self.repo / path
@@ -65,7 +72,7 @@ class NeckbeardCliTests(unittest.TestCase):
         self.git("commit", "-qm", message)
 
     def check(self, *args):
-        environment = os.environ | {"PYTHONPATH": str(ROOT / "src")}
+        environment = isolated_git_environment() | {"PYTHONPATH": str(ROOT / "src")}
         return subprocess.run([sys.executable, "-m", "neckbeard", "check", *args],
                               cwd=self.repo, text=True, capture_output=True, env=environment)
 
@@ -84,6 +91,56 @@ class NeckbeardCliTests(unittest.TestCase):
         self.assertEqual("pass", payload["verdict"])
         self.assertEqual([], payload["violations"])
         self.assertIsNone(payload["error"])
+
+    def test_repository_root_preserves_a_trailing_newline_in_its_name(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repository\n"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True, env=isolated_git_environment())
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, env=isolated_git_environment())
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, env=isolated_git_environment())
+            (repo / ".neckbeard.toml").write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True, env=isolated_git_environment())
+            subprocess.run(["git", "commit", "-qm", "policy"], cwd=repo, check=True, env=isolated_git_environment())
+            environment = isolated_git_environment() | {"PYTHONPATH": str(ROOT / "src")}
+            completed = subprocess.run([sys.executable, "-m", "neckbeard", "check", "--json"], cwd=repo,
+                                       text=True, capture_output=True, env=environment)
+        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+        self.assertEqual("pass", json.loads(completed.stdout)["verdict"])
+
+    def test_policy_symlinks_are_rejected_without_following_their_targets(self):
+        with tempfile.TemporaryDirectory() as external:
+            targets = (Path(external) / "policy.toml", self.repo / "inside-policy.toml")
+            for target in targets:
+                with self.subTest(target=target):
+                    target.write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
+                    (self.repo / ".neckbeard.toml").unlink()
+                    (self.repo / ".neckbeard.toml").symlink_to(target)
+                    self.write("disallowed.txt", "changed\n")
+                    completed, payload = self.result()
+                    self.assertEqual(2, completed.returncode)
+                    self.assertEqual("policy-error", payload["error"]["code"])
+                    self.assertIn("symlink", payload["error"]["message"])
+                    (self.repo / ".neckbeard.toml").unlink()
+                    self.write_policy()
+                    (self.repo / "disallowed.txt").unlink()
+
+    def test_cli_ignores_an_inherited_conflicting_git_dir(self):
+        self.set_policy(deny=["main.txt"])
+        self.write("main.txt", "changed\n")
+        rival = self.repo.parent / f"rival-{self.repo.name}"
+        rival.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=rival, check=True, env=isolated_git_environment())
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=rival, check=True, env=isolated_git_environment())
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=rival, check=True, env=isolated_git_environment())
+        (rival / ".neckbeard.toml").write_text("[scope]\nallow_dependency_changes = false\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=rival, check=True, env=isolated_git_environment())
+        subprocess.run(["git", "commit", "-qm", "policy"], cwd=rival, check=True, env=isolated_git_environment())
+        subprocess.run(["git", "config", "core.worktree", str(rival)], cwd=rival, check=True, env=isolated_git_environment())
+        with patch.dict(os.environ, {"GIT_DIR": str(rival / ".git")}):
+            completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertIn(("main.txt", "path-denied"), {(v["path"], v["code"]) for v in payload["violations"]})
 
     def test_invalid_base_and_invalid_policy_are_errors(self):
         completed = self.check("--base", "does-not-exist")
