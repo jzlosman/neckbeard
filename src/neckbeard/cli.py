@@ -16,12 +16,26 @@ from typing import Any
 from . import __version__
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-SENSITIVE_NAMES = frozenset({
-    "pyproject.toml", "requirements.txt", "requirements-dev.txt", "Pipfile",
-    "Pipfile.lock", "poetry.lock", "uv.lock", "package.json",
-    "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
-    "Cargo.toml", "Cargo.lock", "go.mod", "go.sum",
-})
+SENSITIVE_NAMES = frozenset(
+    {
+        "pyproject.toml",
+        "requirements.txt",
+        "requirements-dev.txt",
+        "Pipfile",
+        "Pipfile.lock",
+        "poetry.lock",
+        "uv.lock",
+        "package.json",
+        "package-lock.json",
+        "npm-shrinkwrap.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "Cargo.toml",
+        "Cargo.lock",
+        "go.mod",
+        "go.sum",
+    }
+)
 
 
 class NeckbeardError(Exception):
@@ -53,7 +67,10 @@ def path_key(path: str) -> bytes:
 def git(root: Path | None, *args: str) -> subprocess.CompletedProcess[bytes]:
     try:
         return subprocess.run(
-            ["git", *args], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            ["git", *args],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             check=False,
         )
     except OSError as error:
@@ -110,9 +127,14 @@ def load_policy(root: Path) -> Policy:
             limits[name] = value
         else:
             raise NeckbeardError("policy-error", f"scope.{name} must be a non-negative integer")
-    return Policy(approved, validate_patterns(scope.get("allow"), "allow"),
-                  validate_patterns(scope.get("deny"), "deny"), limits["max_files"],
-                  limits["max_additions"], limits["max_deletions"])
+    return Policy(
+        approved,
+        validate_patterns(scope.get("allow"), "allow"),
+        validate_patterns(scope.get("deny"), "deny"),
+        limits["max_files"],
+        limits["max_additions"],
+        limits["max_deletions"],
+    )
 
 
 def glob_matches(pattern: str, path: str) -> bool:
@@ -241,9 +263,13 @@ def evaluate(root: Path, policy: Policy, base: str) -> dict[str, Any]:
 
 def error_verdict(error: NeckbeardError) -> dict[str, Any]:
     return {
-        "version": 1, "verdict": "error", "exit_code": 2, "base": None,
+        "version": 1,
+        "verdict": "error",
+        "exit_code": 2,
+        "base": None,
         "summary": {"changed_files": 0, "additions": 0, "deletions": 0},
-        "changed_paths": [], "violations": [],
+        "changed_paths": [],
+        "violations": [],
         "error": {"code": error.code, "message": error.message},
     }
 

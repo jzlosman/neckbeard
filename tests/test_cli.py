@@ -11,10 +11,22 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 SENSITIVE = (
-    "pyproject.toml", "requirements.txt", "requirements-dev.txt", "Pipfile",
-    "Pipfile.lock", "poetry.lock", "uv.lock", "package.json",
-    "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
-    "Cargo.toml", "Cargo.lock", "go.mod", "go.sum",
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "Pipfile",
+    "Pipfile.lock",
+    "poetry.lock",
+    "uv.lock",
+    "package.json",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
 )
 
 
@@ -38,8 +50,7 @@ class NeckbeardCliTests(unittest.TestCase):
         self.temp.cleanup()
 
     def git(self, *args):
-        return subprocess.run(["git", *args], cwd=self.repo, check=True,
-                              text=True, capture_output=True, env=isolated_git_environment())
+        return subprocess.run(["git", *args], cwd=self.repo, check=True, text=True, capture_output=True, env=isolated_git_environment())
 
     def write(self, path, content, binary=False):
         target = self.repo / path
@@ -73,8 +84,7 @@ class NeckbeardCliTests(unittest.TestCase):
 
     def check(self, *args):
         environment = isolated_git_environment() | {"PYTHONPATH": str(ROOT / "src")}
-        return subprocess.run([sys.executable, "-m", "neckbeard", "check", *args],
-                              cwd=self.repo, text=True, capture_output=True, env=environment)
+        return subprocess.run([sys.executable, "-m", "neckbeard", "check", *args], cwd=self.repo, text=True, capture_output=True, env=environment)
 
     def result(self, *args):
         completed = self.check("--json", *args)
@@ -103,8 +113,9 @@ class NeckbeardCliTests(unittest.TestCase):
             subprocess.run(["git", "add", "."], cwd=repo, check=True, env=isolated_git_environment())
             subprocess.run(["git", "commit", "-qm", "policy"], cwd=repo, check=True, env=isolated_git_environment())
             environment = isolated_git_environment() | {"PYTHONPATH": str(ROOT / "src")}
-            completed = subprocess.run([sys.executable, "-m", "neckbeard", "check", "--json"], cwd=repo,
-                                       text=True, capture_output=True, env=environment)
+            completed = subprocess.run(
+                [sys.executable, "-m", "neckbeard", "check", "--json"], cwd=repo, text=True, capture_output=True, env=environment
+            )
         self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
         self.assertEqual("pass", json.loads(completed.stdout)["verdict"])
 
@@ -155,7 +166,7 @@ class NeckbeardCliTests(unittest.TestCase):
         completed, payload = self.result("--base", "")
         self.assertEqual(2, completed.returncode)
         self.assertEqual("base-error", payload["error"]["code"])
-        self.write(".neckbeard.toml", "[scope]\nallow_dependency_changes = \"false\"\n")
+        self.write(".neckbeard.toml", '[scope]\nallow_dependency_changes = "false"\n')
         completed, payload = self.result()
         self.assertEqual(2, completed.returncode)
         self.assertEqual("error", payload["verdict"])
@@ -163,11 +174,14 @@ class NeckbeardCliTests(unittest.TestCase):
 
     def test_policy_validation_rejects_bad_types_budgets_and_patterns(self):
         invalid = [
-            "", "[scope", "[scope]\n", "[scope]\nallow_dependency_changes = false\nmax_files = -1\n",
-            "[scope]\nallow_dependency_changes = false\nallow = \"src/**\"\n",
-            "[scope]\nallow_dependency_changes = false\ndeny = [\"/src/**\"]\n",
-            "[scope]\nallow_dependency_changes = false\ndeny = [\"src\\\\**\"]\n",
-            "[scope]\nallow_dependency_changes = false\ndeny = [\"src/../secret\"]\n",
+            "",
+            "[scope",
+            "[scope]\n",
+            "[scope]\nallow_dependency_changes = false\nmax_files = -1\n",
+            '[scope]\nallow_dependency_changes = false\nallow = "src/**"\n',
+            '[scope]\nallow_dependency_changes = false\ndeny = ["/src/**"]\n',
+            '[scope]\nallow_dependency_changes = false\ndeny = ["src\\\\**"]\n',
+            '[scope]\nallow_dependency_changes = false\ndeny = ["src/../secret"]\n',
         ]
         for policy in invalid:
             with self.subTest(policy=policy):

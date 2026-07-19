@@ -18,16 +18,16 @@
 
 ## 3. Portable skill and project materials
 
-- [ ] 3.1 Add the sole canonical `skills/neckbeard/SKILL.md` with standard `name`/trigger-only `description`, CLI-authoritative workflow, failure stop/report behavior, and no host-specific instructions or duplicate policy.
+- [x] 3.1 Add the sole canonical `skills/neckbeard/SKILL.md` with standard `name`/trigger-only `description`, CLI-authoritative workflow, failure stop/report behavior, and no host-specific instructions or duplicate policy.
 - [ ] 3.2 Pressure-test the skill with a fresh agent in a red scenario: a failing scope check must stop work and report the exact violations without editing policy or bypassing the CLI.
 - [ ] 3.3 Pressure-test the skill with a fresh agent in a green scenario: a passing scope check must be invoked and reported alongside normal verification.
-- [ ] 3.4 Create an accessible hand-authored canonical SVG and generate the supplementary PNG; document that the SVG is canonical.
-- [ ] 3.5 Add public README and docs covering installation, policy schema/globs, fixed dependency catalog, CLI text/JSON/CI usage, limits, and the non-sandbox boundary.
-- [ ] 3.6 Add MIT LICENSE and minimal public community files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and support guidance).
+- [x] 3.4 Create an accessible hand-authored canonical SVG and generate the supplementary PNG; document that the SVG is canonical.
+- [x] 3.5 Add public README and docs covering installation, policy schema/globs, fixed dependency catalog, CLI text/JSON/CI usage, limits, and the non-sandbox boundary.
+- [x] 3.6 Add MIT LICENSE and minimal public community files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and support guidance).
 
 ## 4. Automation, review, and release
 
-- [ ] 4.1 Add CI for supported Python versions that installs the built package, runs tests, lint/format checks, coverage threshold, and wheel/sdist build.
+- [x] 4.1 Add CI for supported Python versions that installs the built package, runs tests, lint/format checks, coverage threshold, and wheel/sdist build.
 - [ ] 4.2 Independently review the CLI/policy implementation against every OpenSpec requirement and resolve findings.
 - [ ] 4.3 Independently review the portable skill, documentation, and release artifacts for host-neutrality, accuracy, accessibility, and scope.
 - [ ] 4.4 Run final clean-worktree verification: full tests, lint/format, coverage, package build, representative text/JSON CLI checks, and both fresh-agent pressure scenarios.

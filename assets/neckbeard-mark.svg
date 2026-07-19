@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Neckbeard</title>
+  <desc id="desc">A navy fence marked with emerald and coral rails.</desc>
+  <rect width="256" height="256" rx="40" fill="#172033"/>
+  <path d="M48 68v120M104 68v120M160 68v120M208 68v120" fill="none" stroke="#21A36A" stroke-linecap="round" stroke-width="20"/>
+  <path d="M34 104h188M34 152h188" fill="none" stroke="#D9545D" stroke-linecap="round" stroke-width="18"/>
+</svg>

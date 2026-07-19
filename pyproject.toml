@@ -5,12 +5,48 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "neckbeard"
 version = "0.1.0"
-description = "Git diff scope checker"
+description = "Repository-owned Git diff scope checker"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jeremy Zaborowski" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/jzlosman/neckbeard"
+Repository = "https://github.com/jzlosman/neckbeard"
+Issues = "https://github.com/jzlosman/neckbeard/issues"
 
 [project.scripts]
 neckbeard = "neckbeard.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+patch = ["subprocess"]
+source = ["neckbeard"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.ruff]
+line-length = 150
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F"]
