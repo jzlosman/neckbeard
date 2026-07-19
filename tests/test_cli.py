@@ -92,6 +92,12 @@ class NeckbeardCliTests(unittest.TestCase):
         completed, payload = self.result("--base", "does-not-exist")
         self.assertEqual(2, completed.returncode)
         self.assertEqual("error", payload["verdict"])
+        completed = self.check("--base", "")
+        self.assertEqual(2, completed.returncode)
+        self.assertTrue(completed.stdout.startswith("ERROR base-error:"), completed.stdout)
+        completed, payload = self.result("--base", "")
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("base-error", payload["error"]["code"])
         self.write(".neckbeard.toml", "[scope]\nallow_dependency_changes = \"false\"\n")
         completed, payload = self.result()
         self.assertEqual(2, completed.returncode)
@@ -127,6 +133,14 @@ class NeckbeardCliTests(unittest.TestCase):
         completed, payload = self.result()
         self.assertEqual(1, completed.returncode)
         self.assertIn(".hidden", [item["path"] for item in payload["violations"]])
+
+    def test_double_star_slash_matches_zero_or_more_directories(self):
+        self.set_policy(allow=["src/**/top.py", "**/name"])
+        for path in ("src/top.py", "src/nested/top.py", "name", "nested/name"):
+            self.write(path, "x\n")
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual([], payload["violations"])
 
     def test_question_glob_and_file_addition_budgets(self):
         self.set_policy(allow=["src/?.py"], max_files=1, max_additions=1)
@@ -204,6 +218,15 @@ class NeckbeardCliTests(unittest.TestCase):
         completed, payload = self.result()
         self.assertEqual(1, completed.returncode)
         self.assertIn(("blob.bin", "unmeasurable-file"), {(v["path"], v["code"]) for v in payload["violations"]})
+
+    def test_untracked_symlink_is_unmeasurable_without_counting_its_target(self):
+        outside = self.repo.parent / "outside.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        (self.repo / "link.txt").symlink_to(outside)
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertEqual({"changed_files": 1, "additions": 0, "deletions": 0}, payload["summary"])
+        self.assertIn(("link.txt", "unmeasurable-file"), {(v["path"], v["code"]) for v in payload["violations"]})
 
     def test_every_sensitive_filename_nested_requires_approval_in_byte_order(self):
         for name in SENSITIVE:

@@ -117,7 +117,10 @@ def glob_matches(pattern: str, path: str) -> bool:
     index = 0
     while index < len(pattern):
         character = pattern[index]
-        if character == "*" and index + 1 < len(pattern) and pattern[index + 1] == "*":
+        if pattern.startswith("**/", index):
+            pieces.append("(?:.*/)?")
+            index += 3
+        elif character == "*" and index + 1 < len(pattern) and pattern[index + 1] == "*":
             pieces.append(".*")
             index += 2
         elif character == "*":
@@ -134,7 +137,7 @@ def glob_matches(pattern: str, path: str) -> bool:
 
 
 def select_base(root: Path, requested: str | None) -> str:
-    candidate = requested or "HEAD"
+    candidate = "HEAD" if requested is None else requested
     result = git(root, "rev-parse", "--verify", f"{candidate}^{{commit}}")
     if result.returncode == 0:
         return os.fsdecode(result.stdout).strip()
@@ -183,8 +186,9 @@ def collect_changes(root: Path, base: str) -> tuple[dict[str, list[int]], set[st
             continue
         path = os.fsdecode(raw_path)
         metrics.setdefault(path, [0, 0])
+        file_path = root / Path(path)
         try:
-            lines = text_lines((root / Path(path)).read_bytes())
+            lines = None if file_path.is_symlink() else text_lines(file_path.read_bytes())
         except OSError:
             lines = None
         if lines is None:
