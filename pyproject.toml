@@ -39,6 +39,7 @@ branch = true
 parallel = true
 patch = ["subprocess"]
 source = ["neckbeard"]
+disable_warnings = ["module-not-imported", "no-data-collected"]
 
 [tool.coverage.report]
 fail_under = 90
