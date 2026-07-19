@@ -1,0 +1,3 @@
+[scope]
+allow_dependency_changes = true
+allow = ["src/**", "tests/**", "pyproject.toml", ".neckbeard.toml", "openspec/**"]

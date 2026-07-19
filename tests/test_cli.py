@@ -1,0 +1,222 @@
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+SENSITIVE = (
+    "pyproject.toml", "requirements.txt", "requirements-dev.txt", "Pipfile",
+    "Pipfile.lock", "poetry.lock", "uv.lock", "package.json",
+    "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+    "Cargo.toml", "Cargo.lock", "go.mod", "go.sum",
+)
+
+
+class NeckbeardCliTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.temp.name)
+        self.git("init", "-q")
+        self.git("config", "user.email", "test@example.com")
+        self.git("config", "user.name", "Test User")
+        self.write_policy()
+        self.commit("policy")
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def git(self, *args):
+        return subprocess.run(["git", *args], cwd=self.repo, check=True,
+                              text=True, capture_output=True)
+
+    def write(self, path, content, binary=False):
+        target = self.repo / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if binary:
+            target.write_bytes(content)
+        else:
+            target.write_text(content, encoding="utf-8")
+
+    def write_policy(self, **scope):
+        values = {"allow_dependency_changes": False, **scope}
+        lines = ["[scope]"]
+        for key, value in values.items():
+            if isinstance(value, bool):
+                rendered = str(value).lower()
+            elif isinstance(value, list):
+                rendered = "[" + ", ".join(json.dumps(item) for item in value) + "]"
+            else:
+                rendered = json.dumps(value)
+            lines.append(f"{key} = {rendered}")
+        self.write(".neckbeard.toml", "\n".join(lines) + "\n")
+
+    def set_policy(self, **scope):
+        self.write_policy(**scope)
+        self.git("add", ".neckbeard.toml")
+        self.git("commit", "-qm", "policy update")
+
+    def commit(self, message):
+        self.git("add", ".")
+        self.git("commit", "-qm", message)
+
+    def check(self, *args):
+        environment = os.environ | {"PYTHONPATH": str(ROOT / "src")}
+        return subprocess.run([sys.executable, "-m", "neckbeard", "check", *args],
+                              cwd=self.repo, text=True, capture_output=True, env=environment)
+
+    def result(self, *args):
+        completed = self.check("--json", *args)
+        self.assertTrue(completed.stdout, completed.stderr)
+        return completed, json.loads(completed.stdout)
+
+    def test_pass_text_json_and_version_contract(self):
+        completed = self.check()
+        self.assertEqual(0, completed.returncode)
+        self.assertTrue(completed.stdout.startswith("PASS"))
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual(["version", "verdict", "exit_code", "base", "summary", "changed_paths", "violations", "error"], list(payload))
+        self.assertEqual("pass", payload["verdict"])
+        self.assertEqual([], payload["violations"])
+        self.assertIsNone(payload["error"])
+
+    def test_invalid_base_and_invalid_policy_are_errors(self):
+        completed = self.check("--base", "does-not-exist")
+        self.assertEqual(2, completed.returncode)
+        self.assertTrue(completed.stdout.startswith("ERROR"))
+        completed, payload = self.result("--base", "does-not-exist")
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("error", payload["verdict"])
+        self.write(".neckbeard.toml", "[scope]\nallow_dependency_changes = \"false\"\n")
+        completed, payload = self.result()
+        self.assertEqual(2, completed.returncode)
+        self.assertEqual("error", payload["verdict"])
+        self.assertIsNotNone(payload["error"])
+
+    def test_policy_validation_rejects_bad_types_budgets_and_patterns(self):
+        invalid = [
+            "", "[scope", "[scope]\n", "[scope]\nallow_dependency_changes = false\nmax_files = -1\n",
+            "[scope]\nallow_dependency_changes = false\nallow = \"src/**\"\n",
+            "[scope]\nallow_dependency_changes = false\ndeny = [\"/src/**\"]\n",
+            "[scope]\nallow_dependency_changes = false\ndeny = [\"src\\\\**\"]\n",
+            "[scope]\nallow_dependency_changes = false\ndeny = [\"src/../secret\"]\n",
+        ]
+        for policy in invalid:
+            with self.subTest(policy=policy):
+                self.write(".neckbeard.toml", policy)
+                completed = self.check("--json")
+                self.assertEqual(2, completed.returncode)
+
+    def test_globs_allow_deny_full_path_and_dotfiles(self):
+        self.set_policy(allow=["src/*.py", ".hidden"], deny=["src/generated/**"])
+        self.write("src/top.py", "x\n")
+        self.write("src/nested/no.py", "x\n")
+        self.write("src/generated/client.py", "x\n")
+        self.write(".hidden", "x\n")
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        codes = {(item["path"], item["code"]) for item in payload["violations"]}
+        self.assertIn(("src/nested/no.py", "path-not-allowed"), codes)
+        self.assertIn(("src/generated/client.py", "path-denied"), codes)
+        self.set_policy(allow=["src/**"])
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertIn(".hidden", [item["path"] for item in payload["violations"]])
+
+    def test_question_glob_and_file_addition_budgets(self):
+        self.set_policy(allow=["src/?.py"], max_files=1, max_additions=1)
+        self.write("src/a.py", "one\n")
+        self.write("src/ab.py", "one\n")
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        codes = {(item["path"], item["code"]) for item in payload["violations"]}
+        self.assertIn(("src/ab.py", "path-not-allowed"), codes)
+        self.assertIn(("", "max-files"), codes)
+        self.assertIn(("", "max-additions"), codes)
+
+    def test_explicit_base_differs_from_default_head(self):
+        self.write("history.txt", "one\n")
+        self.commit("history")
+        explicit_base = self.git("rev-parse", "HEAD").stdout.strip()
+        self.write("history.txt", "two\n")
+        self.commit("new head")
+        self.write("working.txt", "work\n")
+        completed, default = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual(["working.txt"], default["changed_paths"])
+        completed, explicit = self.result("--base", explicit_base)
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual(explicit_base, explicit["base"])
+        self.assertEqual(["history.txt", "working.txt"], explicit["changed_paths"])
+
+    def test_staged_unstaged_untracked_and_ignored_files_are_all_measured(self):
+        self.write("tracked.txt", "old\n")
+        self.write("staged.txt", "before\n")
+        self.write(".gitignore", "ignored.txt\n")
+        self.commit("tracked")
+        self.write("tracked.txt", "new\n")
+        self.write("staged.txt", "after\n")
+        self.git("add", "staged.txt")
+        self.write("untracked.txt", "one\ntwo\n")
+        self.write("ignored.txt", "ignore me\n")
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual(["staged.txt", "tracked.txt", "untracked.txt"], payload["changed_paths"])
+        self.assertEqual({"changed_files": 3, "additions": 4, "deletions": 2}, payload["summary"])
+
+    def test_budgets_deletion_and_rename_are_complete(self):
+        self.write("src/a.py", "old\n")
+        self.write("delete.txt", "bye\n")
+        self.commit("files")
+        self.set_policy(allow=["**"], deny=["secrets/**"], max_deletions=1)
+        (self.repo / "secrets").mkdir()
+        self.git("mv", "src/a.py", "secrets/a.py")
+        (self.repo / "delete.txt").unlink()
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertEqual(["delete.txt", "secrets/a.py", "src/a.py"], payload["changed_paths"])
+        codes = {(item["path"], item["code"]) for item in payload["violations"]}
+        self.assertIn(("secrets/a.py", "path-denied"), codes)
+        self.assertIn(("", "max-deletions"), codes)
+
+    def test_unborn_head_defaults_to_empty_tree(self):
+        self.temp.cleanup()
+        self.temp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.temp.name)
+        self.git("init", "-q")
+        self.write_policy()
+        self.write("new.txt", "new\n")
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertEqual(EMPTY_TREE, payload["base"])
+        self.assertIn("new.txt", payload["changed_paths"])
+
+    def test_binary_files_fail_closed(self):
+        self.write("blob.bin", b"a\x00b", binary=True)
+        completed = self.check()
+        self.assertEqual(1, completed.returncode)
+        self.assertTrue(completed.stdout.startswith("FAIL"))
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        self.assertIn(("blob.bin", "unmeasurable-file"), {(v["path"], v["code"]) for v in payload["violations"]})
+
+    def test_every_sensitive_filename_nested_requires_approval_in_byte_order(self):
+        for name in SENSITIVE:
+            self.write(f"nested/{name}", "x\n")
+        completed, payload = self.result()
+        self.assertEqual(1, completed.returncode)
+        violations = [item for item in payload["violations"] if item["code"] == "dependency-change"]
+        self.assertEqual(sorted(f"nested/{name}" for name in SENSITIVE), [item["path"] for item in violations])
+        self.set_policy(allow_dependency_changes=True)
+        completed, payload = self.result()
+        self.assertEqual(0, completed.returncode)
+        self.assertFalse(payload["violations"])
+
+
+if __name__ == "__main__":
+    unittest.main()

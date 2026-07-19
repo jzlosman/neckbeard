@@ -1,20 +1,20 @@
 ## 1. Contract tests and minimal project foundation
 
-- [ ] 1.1 Create the Python 3.11 package, `unittest` test harness, console entry point, and zero-runtime-dependency packaging metadata.
-- [ ] 1.2 Write failing black-box CLI contract tests for `check`, `--base`, `--json`, text prefixes, deterministic JSON field order, and exit codes 0/1/2.
-- [ ] 1.3 Write failing policy tests for required TOML fields, invalid policies, normalized POSIX paths, and the specified `*`, `?`, and `**` full-path glob semantics.
-- [ ] 1.4 Write failing temporary-real-Git tests for explicit and default bases, unborn repositories, staged and unstaged changes, untracked non-ignored files, deletions, renames as delete-plus-add, ordering, and binary/unmeasurable failures.
-- [ ] 1.5 Write failing dependency-gate tests for every documented sensitive filename, nested paths, approval, and deterministic multiple violations.
+- [x] 1.1 Create the Python 3.11 package, `unittest` test harness, console entry point, and zero-runtime-dependency packaging metadata.
+- [x] 1.2 Write failing black-box CLI contract tests for `check`, `--base`, `--json`, text prefixes, deterministic JSON field order, and exit codes 0/1/2.
+- [x] 1.3 Write failing policy tests for required TOML fields, invalid policies, normalized POSIX paths, and the specified `*`, `?`, and `**` full-path glob semantics.
+- [x] 1.4 Write failing temporary-real-Git tests for explicit and default bases, unborn repositories, staged and unstaged changes, untracked non-ignored files, deletions, renames as delete-plus-add, ordering, and binary/unmeasurable failures.
+- [x] 1.5 Write failing dependency-gate tests for every documented sensitive filename, nested paths, approval, and deterministic multiple violations.
 
 ## 2. Checker implementation
 
-- [ ] 2.1 Implement strict `.neckbeard.toml` loading and validation, including non-negative budgets and traversal-like glob rejection.
-- [ ] 2.2 Implement the specified repository-relative glob matcher and allow/deny/budget evaluation, with deny taking precedence.
-- [ ] 2.3 Collect complete facts from real Git without mutation: selected base (or empty tree for unborn `HEAD`), tracked staged/unstaged changes with rename detection disabled, and non-ignored untracked files.
-- [ ] 2.4 Measure text additions/deletions, count untracked text lines, and emit explicit violations for binary or unmeasurable files.
-- [ ] 2.5 Apply the fixed dependency-path catalog and require `allow_dependency_changes = true` while retaining all ordinary path and budget checks.
-- [ ] 2.6 Implement one deterministic verdict model and its concise text and single-object JSON renderers, including ordered paths/violations and operational-error handling.
-- [ ] 2.7 Make the contract tests pass and add only focused regressions discovered during implementation.
+- [x] 2.1 Implement strict `.neckbeard.toml` loading and validation, including non-negative budgets and traversal-like glob rejection.
+- [x] 2.2 Implement the specified repository-relative glob matcher and allow/deny/budget evaluation, with deny taking precedence.
+- [x] 2.3 Collect complete facts from real Git without mutation: selected base (or empty tree for unborn `HEAD`), tracked staged/unstaged changes with rename detection disabled, and non-ignored untracked files.
+- [x] 2.4 Measure text additions/deletions, count untracked text lines, and emit explicit violations for binary or unmeasurable files.
+- [x] 2.5 Apply the fixed dependency-path catalog and require `allow_dependency_changes = true` while retaining all ordinary path and budget checks.
+- [x] 2.6 Implement one deterministic verdict model and its concise text and single-object JSON renderers, including ordered paths/violations and operational-error handling.
+- [x] 2.7 Make the contract tests pass and add only focused regressions discovered during implementation.
 
 ## 3. Portable skill and project materials
 
